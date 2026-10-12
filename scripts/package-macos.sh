@@ -57,7 +57,10 @@ if [[ "$include_aax" == --include-aax ]]; then
     : "${MOTEFIELD_SIGNED_AAX_PATH:?Set the path of the final PACE-signed AAX bundle}"
     "${PACE_WRAPTOOL:-wraptool}" verify --in "$target"
     codesign --verify --deep --strict "$target"
-    codesign -dvv "$target" 2>&1 | grep -q 'Authority=Developer ID Application:' || {
+    # Capture all output: grep -q can close the pipe early and make codesign
+    # fail with SIGPIPE under pipefail even when the expected signer is present.
+    signature_details="$(codesign -dvv "$target" 2>&1)"
+    [[ "$signature_details" == *'Authority=Developer ID Application:'* ]] || {
       echo "AAX must also carry a Developer ID Application signature." >&2; exit 1;
     }
   fi
@@ -104,12 +107,15 @@ else
 fi
 package="${output_dir}/MoteField-${version}-macOS-universal${suffix}.pkg"
 [[ -z "$include_aax" ]] || package="${output_dir}/MoteField-${version}-macOS-universal-AAX${suffix}.pkg"
+resources="${project_dir}/packaging/macos"
+[[ -z "$include_aax" ]] || resources="${resources}/aax"
 productbuild --distribution "${work_dir}/distribution.xml" --package-path "$work_dir" \
-  --resources "${project_dir}/packaging/macos" ${sign_args[@]+"${sign_args[@]}"} "${work_dir}/installer.pkg"
+  --resources "$resources" ${sign_args[@]+"${sign_args[@]}"} "${work_dir}/installer.pkg"
 if [[ "$mode" == --release ]]; then
+  notary_result="${output_dir}/MoteField-${version}${include_aax:+-AAX}-notary.json"
   xcrun notarytool submit "${work_dir}/installer.pkg" --keychain-profile "$NOTARY_PROFILE" \
-    --wait --output-format json > "${output_dir}/MoteField-${version}-notary.json"
-  python3 - "${output_dir}/MoteField-${version}-notary.json" <<'PY'
+    --wait --output-format json > "$notary_result"
+  python3 - "$notary_result" <<'PY'
 import json, sys
 with open(sys.argv[1]) as f:
     result = json.load(f)
