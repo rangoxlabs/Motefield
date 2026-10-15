@@ -26,6 +26,10 @@ jobs:
         run: bash scripts/package-macos.sh --unsigned
       - name: Package AAX development installer
         run: bash scripts/package-macos.sh --unsigned --include-aax
+      - name: Verify installer format selections and payloads
+        run: |
+          python3 scripts/test-macos-installer.py dist/installers/*-macOS-universal-Selectable-UNSIGNED.pkg
+          python3 scripts/test-macos-installer.py dist/installers/*-macOS-universal-AAX-Selectable-UNSIGNED.pkg --include-aax
       - name: Package direct-install test ZIP
         run: bash scripts/package-friend-macos.sh
       - uses: actions/upload-artifact@v4
