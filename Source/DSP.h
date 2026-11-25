@@ -30,6 +30,28 @@ inline constexpr std::array<const char*, static_cast<std::size_t> (Mode::count)>
     "Chop", "Break", "Ladder", "Grid", "Smear"
 };
 
+// Display text for the playback intervals each mode variation applies on top of
+// Transpose, in semitones. Keep in step with Impl::ratesFor and the Smear taps.
+inline const char* modeIntervalSummary (Mode mode, int variation) noexcept
+{
+    static constexpr const char* unison = "Unison";
+    static constexpr const char* table[static_cast<std::size_t> (Mode::count)][4] {
+        /* bloom  */ { "0 / +12", "0 / -12", "+12", "-12 to +24" },
+        /* chain  */ { unison, "0 / -12", unison, "-24 to +12" },
+        /* slide  */ { "Glide -12 > 0", "Glide +12 > -12", "Glide 0 > +12", "Glide -12 <> +12" },
+        /* veil   */ { "Detune +/-1", "Detune +/-5", "0 / +12", "0 / -12" },
+        /* orbit  */ { unison, "-12", unison, "Glide -6 > +5" },
+        /* pluck  */ { unison, "Slight detune", unison, "0 / +12" },
+        /* chop   */ { "Detune +/-2", "-12 to +24", "Detune +/-2", "-24 to +12" },
+        /* break  */ { "Detune +/-2", "-12 to +24", "Detune +/-2", "-24 to +12" },
+        /* ladder */ { "0 +4 +7 +12", "0 -5 -12 +5", "-12 to +24", "0 +12 +7 +4" },
+        /* grid   */ { unison, unison, unison, unison },
+        /* smear  */ { unison, unison, "+12 taps", unison } };
+    const auto m = static_cast<int> (mode);
+    if (m < 0 || m >= static_cast<int> (Mode::count)) return unison;
+    return table[m][variation < 0 ? 0 : variation > 3 ? 3 : variation];
+}
+
 enum class LooperCommand : int
 {
     none = 0,

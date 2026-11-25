@@ -18,7 +18,7 @@ class TuningPanel final : public juce::Component
             g.setColour (juce::Colour (0xff778568)); g.drawRoundedRectangle (0.5f, .5f, 239, 47, 6, 1);
             panel.label (g, "TRANSPOSE", 8, 4, 125, 18, 10);
             panel.label (g, panel.pitchText() + " st", 128, 4, 82, 18, 13, true);
-            panel.label (g, panel.interval(), 8, 25, 137, 18, 10);
+            panel.label (g, "MODE  " + panel.modePattern (false), 8, 25, 137, 18, 10);
             panel.label (g, "A4 " + juce::String (panel.value ("tuningReference"), 1).trimCharactersAtEnd ("0").trimCharactersAtEnd (".") + " Hz", 142, 25, 88, 18, 10);
         }
         TuningPanel& panel;
@@ -137,8 +137,8 @@ public:
         label (g,interval(),0,115,240,20,12,true);
         rule (g,136); label (g,"Fine tuning",0,142,129,30,12); label (g,"cents",214,144,26,26,9);
         rule (g,179); label (g,"A4 reference",0,183,240,22,12); label (g,"Hz",85,211,30,27,11);
-        label (g,"Source A4 = 440 Hz",0,250,240,19,10);
         const float offset = 1200.f * std::log2 (value ("tuningReference") / 440.f);
+        label (g,"Mode pattern: " + modePattern (true),0,250,240,19,10);
         label (g,"Reference offset: " + juce::String (offset,1) + " cents",0,270,240,19,10);
     }
 private:
@@ -155,6 +155,16 @@ private:
     {
         static const char* names[] { "Unison", "Minor second", "Major second", "Minor third", "Major third", "Perfect fourth", "Tritone", "Perfect fifth", "Minor sixth", "Major sixth", "Minor seventh", "Major seventh", "Octave", "Minor ninth", "Major ninth", "Minor tenth", "Major tenth", "Perfect eleventh", "Augmented eleventh", "Perfect twelfth", "Minor thirteenth", "Major thirteenth", "Minor fourteenth", "Major fourteenth", "Two octaves" };
         return juce::String (names[juce::jlimit (0,24,std::abs (coarse()))]) + (coarse() < 0 ? " down" : "") + (fine() != 0 ? " / " + juce::String (juce::roundToInt (fine())) + " ct" : "");
+    }
+    // What the selected mode adds on top of Transpose, so the display matches what is heard.
+    juce::String modePattern (bool detailed) const
+    {
+        const auto mode = static_cast<motefield::Mode> (juce::jlimit (0, static_cast<int> (motefield::Mode::count) - 1, juce::roundToInt (value (motefield::parameter::mode))));
+        juce::String text (motefield::modeIntervalSummary (mode, juce::roundToInt (value (motefield::parameter::variation))));
+        const bool mutated = juce::roundToInt (value ("pitchMutation")) != 0, scaled = juce::roundToInt (value ("scale")) != 0;
+        if (detailed) { if (text != "Unison") text << " st"; if (mutated) text << ", mutated"; if (scaled) text << ", in scale"; }
+        else if (mutated) text << " +mut";
+        return text;
     }
     void setPitch (int st, float ct) { processor.setParameterValue ("fieldPitch", juce::jlimit (-24.f,24.f,juce::jlimit(-24,24,st) + juce::jlimit(-99.f,99.f,ct)/100.f)); refresh(); }
     void commitPitch() { if (! refreshing && opened) setPitch (transpose.getText().getIntValue(), cents.getText().getFloatValue()); }
