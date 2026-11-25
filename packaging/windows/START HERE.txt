@@ -1,49 +1,42 @@
-MOTEFIELD 0.3.7 / RANGO LABS / WINDOWS TEST BUILD
+MOTEFIELD FOR WINDOWS / RANGO LABS / FREE DOWNLOAD
 
-For Windows 10/11 with a 64-bit VST3-compatible DAW on Intel/AMD.
-This package is not the Mac version. Native Windows ARM testing is pending.
+For Windows 10/11, 64-bit Intel/AMD, in any VST3-compatible DAW
+(Ableton Live, FL Studio, Reaper, Cubase, Studio One, Bitwig and others).
 
-1. Extract the ZIP. Save your session and close your DAW.
-2. Run MoteField-0.3.7-Windows-x64-UNSIGNED.exe.
-3. Approve the administrator prompt and complete installation.
-4. Reopen your DAW and rescan VST3 plugins. Look for MoteField by Rango Labs.
-5. Load it on an audio track receiving sound, choose First Light, and raise Mix.
+Windows includes VST3 only. Pro Tools on Windows (AAX) is not supported yet.
+Pro Tools on Mac is supported by the Mac installer.
 
-The installer puts the plugin here:
+INSTALL
+1. Save your session and close your DAW.
+2. Run the MoteField ...-Windows-x64-UNSIGNED.exe installer.
+3. If Windows shows "Windows protected your PC" (see below), click
+   More info, then Run anyway.
+4. Approve the administrator prompt and finish the installer.
+5. Reopen your DAW and rescan VST3 plug-ins. Look for MoteField by Rango Labs.
+6. Put it on an audio track, choose a preset such as First Light, and raise Mix.
+
+The installer puts the plug-in here:
 C:\Program Files\Common Files\VST3\MoteField.vst3
 
-Use the DAW's standard/system VST3 scan. Do not open the .vst3 as an app.
-The UI includes the reactive fluid, RANDOM sound generator, user preset SAVE,
-recorded-loop display, custom accent colors, and dark mode in Settings.
+Use your DAW's standard VST3 scan. Do not open the .vst3 file as an app.
 
-PRIVATE TEST BUILD
-This installer is not code-signed. Windows may show an unknown-publisher or
-SmartScreen reputation warning. Only proceed with the file received directly
-from Rango Labs. If Windows offers More info > Run anyway, that applies to this
-individual installer. Do not disable Defender or SmartScreen globally.
-If a managed-device policy or Smart App Control blocks installation, send us
-the exact message; this installer does not override those controls.
+WHY WINDOWS WARNS YOU
+MoteField is free, and the Windows installer is not yet code-signed.
+Windows SmartScreen warns about any installer from a publisher it doesn't
+recognise yet, so you may see "Windows protected your PC" or
+"Unknown publisher". This is a reputation warning, not a virus detection.
+
+- Only run the installer downloaded from Rango Labs' official page.
+- More info > Run anyway applies only to this one installer.
+- Do not turn off Defender or SmartScreen.
+- If your organisation's device policy or Smart App Control blocks the
+  installer, MoteField can't be installed on that computer.
+  The installer doesn't bypass those controls.
 
 UNINSTALL
-Use Windows Settings > Apps > Installed apps (Apps & features on Windows 10),
-find MoteField, and select Uninstall. Quit the DAW first.
+Quit your DAW. Open Windows Settings > Apps > Installed apps
+(Apps & features on Windows 10), find MoteField, and select Uninstall.
 
-FEEDBACK
-Send your Windows version, DAW/version, preset name, and what happened.
-The build and automated checks run on Windows; real DAW playback on your
-machine is the next test. Keep a copy of important projects when testing.
-
-INCLUDED SINCE 0.3.4
-Stereo Width, Wet Solo, Level Match, more responsive reactor motion, and
-preset arrows directly beside the preset box. All three new controls automate.
-
-FIXED IN 0.3.5
-Gentler widening above 100%, capped at 10% extra side gain. POST loops now
-record their width and keep it during playback/export. PRE routing is unchanged.
-
-NEW IN 0.3.7
-Tuning recalls with presets. TRANSPOSE opens an in-place page with interval,
-fine cents and A4 reference. Five new tuned presets bring the factory bank to 37;
-all use A4 440 Hz. PERFORM adds recording start, one-bar count-in and fixed
-1/2/4/8-bar length (60-second maximum). Armed recording can be cancelled with
-REC or STOP. Existing sessions/presets remain readable. All 65 parameters automate.
+FEEDBACK AND HELP
+Email pete@rangolabs.co with your Windows version, your DAW and its version,
+the preset you used, and what happened.

@@ -608,8 +608,9 @@ void FieldDisplay::mouseDoubleClick (const juce::MouseEvent& event)
 {
     if (! gesture) return;
     if (dragging) mouseUp (event);
-    for (const auto* id : { "fieldPosition", "fieldPitch", "fieldStretch", "fieldSplit" })
-    { if (pitchLocked && juce::String(id)=="fieldPitch") continue; gesture (id,0.f,0); gesture (id,juce::String (id) == "fieldStretch" ? 1.f : 0.f,1); gesture (id,0.f,2); }
+    // Pitch is a tuning decision: only the tuning reset or an explicit edit clears it.
+    for (const auto* id : { "fieldPosition", "fieldStretch", "fieldSplit" })
+    { gesture (id,0.f,0); gesture (id,juce::String (id) == "fieldStretch" ? 1.f : 0.f,1); gesture (id,0.f,2); }
 }
 
 void FieldDisplay::paint (juce::Graphics& g)

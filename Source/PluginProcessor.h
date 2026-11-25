@@ -125,6 +125,7 @@ private:
     std::mutex archiveMutex;
     juce::MemoryBlock pendingLoopData;
     bool prepared = false;
+    juce::AudioBuffer<float> monoScratch { 3, 512 };
     double currentSampleRate = 44100.0;
 
     std::atomic<double> effectiveBpm { 120.0 };

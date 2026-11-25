@@ -496,6 +496,27 @@ void checkPerformanceIntegration (const juce::File& root)
     juce::AudioBuffer<float> sideBlock (3,400); sideBlock.clear(); for (int i = 0; i < 400; ++i) sideBlock.setSample (2,i,.8f);
     reopened.setParameterValue ("magnetAmount",1); for (int tick = 0; tick < 4; ++tick) reopened.processBlock (sideBlock,midi);
     motefield::VisualFrame frame; reopened.readVisualFrame (frame); require (frame.magnet > 0,"sidechain did not reach engine");
+    // Mono in / stereo out: the right output shares a host channel with the sidechain.
+    for (const auto auxiliary : {juce::AudioChannelSet::disabled(),juce::AudioChannelSet::mono(),juce::AudioChannelSet::stereo()})
+    {
+        MoteFieldAudioProcessor instance; auto layout=instance.getBusesLayout();
+        layout.inputBuses.set(0,juce::AudioChannelSet::mono());layout.outputBuses.set(0,juce::AudioChannelSet::stereo());layout.inputBuses.set(1,auxiliary);
+        require(instance.setBusesLayout(layout),"mono-to-stereo layout rejected");
+        instance.prepareToPlay(48000,128);instance.setParameterValue("magnetAmount",1.f);
+        const int total=juce::jmax(2,1+auxiliary.size());
+        const auto fill=[&](juce::AudioBuffer<float>& b){b.clear();for(int i=0;i<b.getNumSamples();++i){b.setSample(0,i,.25f*std::sin(i*.05f));if(auxiliary.size()>0)b.setSample(auxiliary.size(),i,.5f);}};
+        instance.setParameterValue(motefield::parameter::bypass,1.f);
+        juce::AudioBuffer<float> dryBlock(total,2000);
+        for(int tick=0;tick<40;++tick){fill(dryBlock);instance.processBlock(dryBlock,midi);} // oversized blocks, settled bypass
+        for(int i=0;i<2000;++i){const auto expected=.25f*std::sin(i*.05f);require(std::abs(dryBlock.getSample(0,i)-expected)<.001f&&std::abs(dryBlock.getSample(1,i)-expected)<.001f,"mono-to-stereo bypass is not dry on both outputs");}
+        instance.setParameterValue(motefield::parameter::bypass,0.f);instance.setParameterValue(motefield::parameter::mix,1.f);instance.setParameterValue("width",1.f);
+        instance.setParameterValue(motefield::parameter::mode,static_cast<float>(motefield::Mode::veil));
+        double difference=0,energy=0;juce::AudioBuffer<float> wetBlock(total,480);
+        for(int tick=0;tick<300;++tick){fill(wetBlock);instance.processBlock(wetBlock,midi);for(int i=0;i<480;++i){const auto l=wetBlock.getSample(0,i),r=wetBlock.getSample(1,i);require(std::isfinite(l)&&std::isfinite(r),"non-finite mono-to-stereo output");difference+=std::abs(l-r);energy+=std::abs(l)+std::abs(r);}}
+        require(energy>1.&&difference>energy*.01,"mono-to-stereo output is silent or not stereo");
+        motefield::VisualFrame telemetry;instance.readVisualFrame(telemetry);
+        if(auxiliary.size()>0)require(telemetry.magnet>.01f,"mono-to-stereo sidechain was overwritten by the right output");
+    }
     for (const auto main : {juce::AudioChannelSet::mono(),juce::AudioChannelSet::stereo()})
         for (const auto auxiliary : {juce::AudioChannelSet::disabled(),juce::AudioChannelSet::mono(),juce::AudioChannelSet::stereo()})
         {
@@ -667,6 +688,21 @@ int main (int argc, char** argv)
             }
             return 0;
         }
+        if (argc > 2 && juce::String (argv[2]) == "--tuning-readout")
+        {
+            processor.prepareToPlay (48000, 400);
+            std::unique_ptr<MoteFieldAudioProcessorEditor> editor (static_cast<MoteFieldAudioProcessorEditor*> (processor.createEditor()));
+            editor->setVisible (true); editor->setSize (1620, 972);
+            processor.setParameterValue (motefield::parameter::mode, static_cast<float> (motefield::Mode::bloom));
+            processor.setParameterValue (motefield::parameter::variation, 0.f);
+            editor->refreshDisplay(); saveImage (*editor, destination.getChildFile ("readout-bloom-a.png"));
+            processor.setParameterValue (motefield::parameter::mode, static_cast<float> (motefield::Mode::ladder));
+            editor->refreshDisplay(); saveImage (*editor, destination.getChildFile ("readout-ladder-a.png"));
+            click (*editor, "tuning-open");
+            auto* tuning = dynamic_cast<TuningPanel*> (find (*editor, "tuning-panel")); require (tuning && tuning->isOpen(), "tuning page did not open");
+            editor->refreshDisplay(); saveImage (*editor, destination.getChildFile ("tuning-current-ladder-a.png"));
+            return 0;
+        }
         if (argc > 2 && juce::String (argv[2]) == "--bypass-style-only")
         {
             processor.prepareToPlay (48000, 400);
@@ -803,7 +839,8 @@ int main (int argc, char** argv)
         field->mouseDown (makeMouse (100,80,1)); field->mouseDrag (makeMouse (140,60,1)); field->mouseUp (makeMouse (140,60,1));
         require (processor.parameters.getRawParameterValue ("fieldPitch")->load() > 0 && fieldHost.starts == 1 && fieldHost.ends == 1,"fluid drag did not notify host with a complete gesture");
         field->mouseDown (makeMouse (100,80,2)); field->mouseDoubleClick (makeMouse (100,80,2)); field->mouseUp (makeMouse (100,80,2));
-        require (std::abs (processor.parameters.getRawParameterValue ("fieldPitch")->load()) < .001f,"double-click did not reset field pitch");
+        require (processor.parameters.getRawParameterValue ("fieldPitch")->load() > 0 && std::abs (processor.parameters.getRawParameterValue ("fieldPosition")->load()) < .001f,"double-click must reset scan and keep transpose");
+        processor.setParameterValue ("fieldPitch", 0.f);
         require (fieldHost.starts == fieldHost.ends,"double-click left an automation gesture open"); pitchParameter->removeListener (&fieldHost);
         auto* presetMenu = dynamic_cast<juce::ComboBox*> (find (*editor, "presets"));
         bool saveLabelFound = false;

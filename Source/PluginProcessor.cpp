@@ -33,7 +33,8 @@ void MoteFieldAudioProcessor::prepareToPlay (double sampleRate, int samplesPerBl
 {
     auto saved = loopData();
     { std::lock_guard<std::mutex> lock (archiveMutex);
-      engine.prepare (sampleRate, samplesPerBlock, getTotalNumOutputChannels()); prepared = true; currentSampleRate = sampleRate; }
+      engine.prepare (sampleRate, samplesPerBlock, getTotalNumOutputChannels()); prepared = true; currentSampleRate = sampleRate;
+      monoScratch.setSize (3, juce::jmax (512, samplesPerBlock), false, false, true); }
     if (saved.getSize() > 0) restoreLoopData (saved);
     pendingLooperTriggers.store (0);
 }
@@ -49,7 +50,9 @@ bool MoteFieldAudioProcessor::isBusesLayoutSupported (const BusesLayout& layouts
 {
     const auto input = layouts.getMainInputChannelSet();
     const auto output = layouts.getMainOutputChannelSet();
-    if (input != output) return false;
+    // Matching mono or stereo, plus mono in / stereo out for mono tracks.
+    const bool monoToStereo = input == juce::AudioChannelSet::mono() && output == juce::AudioChannelSet::stereo();
+    if (input != output && ! monoToStereo) return false;
     // AU hosts may negotiate the auxiliary input as stereo even when no external
     // source is selected. Accept its layout independently of the main bus.
     if (layouts.inputBuses.size() > 1)
@@ -92,6 +95,16 @@ void MoteFieldAudioProcessor::processBlock (juce::AudioBuffer<float>& buffer, ju
 void MoteFieldAudioProcessor::processAudio (juce::AudioBuffer<float>& buffer, int offset, int samples)
 {
     juce::ScopedNoDenormals noDenormals;
+    // Mono in / stereo out: the host buffer's second channel is the right output and,
+    // with Magnet enabled, also the first sidechain channel. Inputs are copied to
+    // preallocated scratch before the engine writes, in chunks that always fit it.
+    const bool monoToStereo = getMainBusNumInputChannels() == 1 && getMainBusNumOutputChannels() >= 2 && buffer.getNumChannels() >= 2;
+    if (monoToStereo && samples > monoScratch.getNumSamples())
+    {
+        const auto capacity = juce::jmax (1, monoScratch.getNumSamples());
+        for (int done = 0; done < samples; done += capacity) processAudio (buffer, offset + done, juce::jmin (capacity, samples - done));
+        return;
+    }
     // Both host automation and UI actions publish bounded, allocation-free flags.
     // Only this audio thread writes to the DSP command queue.
     const auto commands = pendingLooperTriggers.exchange (0, std::memory_order_acq_rel);
@@ -101,7 +114,7 @@ void MoteFieldAudioProcessor::processAudio (juce::AudioBuffer<float>& buffer, in
         motefield::LooperCommand::recordPlayDub, motefield::LooperCommand::stopPlay };
     for (std::size_t i = 0; i < actions.size(); ++i)
         if ((commands & (1u << i)) != 0) engine.requestLooperCommand (actions[i]);
-    const auto channels = juce::jlimit (1, 2, getMainBusNumInputChannels());
+    const auto channels = monoToStereo ? 2 : juce::jlimit (1, 2, getMainBusNumInputChannels());
 
     const auto load = [this] (const char* id)
     {
@@ -166,8 +179,17 @@ void MoteFieldAudioProcessor::processAudio (juce::AudioBuffer<float>& buffer, in
     if (getBusCount (true) > 1 && getBus (true, 1)->isEnabled())
     {
         auto side = getBusBuffer (buffer, true, 1);
-        if (side.getNumChannels() > 0) values.sidechain = side.getReadPointer (0) + offset;
-        if (side.getNumChannels() > 1) values.sidechainRight = side.getReadPointer (1) + offset;
+        if (monoToStereo)
+        {
+            for (int ch = 0; ch < juce::jmin (2, side.getNumChannels()); ++ch) monoScratch.copyFrom (ch + 1, 0, side, ch, offset, samples);
+            if (side.getNumChannels() > 0) values.sidechain = monoScratch.getReadPointer (1);
+            if (side.getNumChannels() > 1) values.sidechainRight = monoScratch.getReadPointer (2);
+        }
+        else
+        {
+            if (side.getNumChannels() > 0) values.sidechain = side.getReadPointer (0) + offset;
+            if (side.getNumChannels() > 1) values.sidechainRight = side.getReadPointer (1) + offset;
+        }
     }
     bool hostTempoFound = false;
     beatsPerBar.store (4.0);
@@ -192,9 +214,10 @@ void MoteFieldAudioProcessor::processAudio (juce::AudioBuffer<float>& buffer, in
     receivingHostTempo.store (hostTempoFound, std::memory_order_relaxed);
     effectiveBpm.store (values.bpm, std::memory_order_relaxed);
 
+    if (monoToStereo) monoScratch.copyFrom (0, 0, buffer, 0, offset, samples);
     std::array<const float*, 2> inputs {
-        buffer.getReadPointer (0) + offset,
-        (channels > 1 ? buffer.getReadPointer (1) : buffer.getReadPointer (0)) + offset
+        monoToStereo ? monoScratch.getReadPointer (0) : buffer.getReadPointer (0) + offset,
+        monoToStereo ? monoScratch.getReadPointer (0) : (channels > 1 ? buffer.getReadPointer (1) : buffer.getReadPointer (0)) + offset
     };
     std::array<float*, 2> outputs {
         buffer.getWritePointer (0) + offset,
